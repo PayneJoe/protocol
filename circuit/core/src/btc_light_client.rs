@@ -1,3 +1,4 @@
+use crate::get_merkle_root;
 use crypto_bigint::CheckedAdd;
 use crypto_bigint::U256;
 use serde::{Deserialize, Serialize};
@@ -122,7 +123,8 @@ pub fn verify_block(
 }
 
 pub fn assert_blockchain(
-    commited_block_hashes: Vec<[u8; 32]>,
+    // commited_block_hashes: Vec<[u8; 32]>,
+    commited_block_hashes_merkle_root: [u8; 32],
     commited_block_chainworks: Vec<U256>,
     safe_block_height: u64,
     retarget_block_hash: [u8; 32],
@@ -135,10 +137,19 @@ pub fn assert_blockchain(
         "Initial Retarget block hash mismatch"
     );
 
+    // assert_eq!(
+    //     commited_block_hashes.len(),
+    //     blocks.len(),
+    //     "Block count mismatch between commited block hashes and blocks provided"
+    // );
     assert_eq!(
-        commited_block_hashes.len(),
-        blocks.len(),
-        "Block count mismatch between commited block hashes and blocks provided"
+        commited_block_hashes_merkle_root,
+        get_merkle_root(
+            blocks
+                .iter()
+                .map(|bk| bk.compute_block_hash())
+                .collect::<Vec<_>>(),
+        )
     );
 
     let mut current_chainwork = *commited_block_chainworks.first().unwrap();
@@ -149,15 +160,15 @@ pub fn assert_blockchain(
         let next_block = &blocks[i + 1];
         let current_block_hash = current_block.compute_block_hash();
         let next_block_hash = next_block.compute_block_hash();
-        assert_eq!(
-            current_block_hash, commited_block_hashes[i],
-            "Commited block hash mismatch"
-        );
-        assert_eq!(
-            next_block_hash,
-            commited_block_hashes[i + 1],
-            "Commited block hash mismatch"
-        );
+        // assert_eq!(
+        //     current_block_hash, commited_block_hashes[i],
+        //     "Commited block hash mismatch"
+        // );
+        // assert_eq!(
+        //     next_block_hash,
+        //     commited_block_hashes[i + 1],
+        //     "Commited block hash mismatch"
+        // );
 
         // Change retarget block if necessary
         if next_block.height % 2016 == 0 {
@@ -188,9 +199,9 @@ pub fn assert_blockchain(
         "Chainwork mismatch"
     );
 
-    assert_eq!(
-        blocks.last().unwrap().compute_block_hash(),
-        *commited_block_hashes.last().unwrap(),
-        "Commited block hash mismatch"
-    );
+    // assert_eq!(
+    //     blocks.last().unwrap().compute_block_hash(),
+    //     *commited_block_hashes.last().unwrap(),
+    //     "Commited block hash mismatch"
+    // );
 }

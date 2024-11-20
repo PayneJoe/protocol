@@ -9,7 +9,7 @@ use alloy_sol_types::sol;
 use constants::{MAX_BLOCKS, MAX_LIQUIDITY_PROVIDERS, MAX_MERKLE_PROOF_STEPS, MAX_TX_SIZE};
 use crypto_bigint::U256;
 use serde::{Deserialize, Serialize};
-use sha256_merkle::MerkleProofStep;
+use sha256_merkle::{MerkleProofStep, hash_pairs};
 
 mod arrays {
     use std::{convert::TryInto, marker::PhantomData};
@@ -100,7 +100,8 @@ sol! {
         uint64 safe_block_height;
         uint64 safe_block_height_delta;
         uint64 confirmation_block_height_delta;
-        bytes32[] block_hashes;
+        // bytes32[] block_hashes;
+        bytes32 block_hashes_merkle_root;
         uint256[] block_chainworks;
         bool is_transaction_proof;
     }
@@ -166,9 +167,91 @@ impl CircuitPublicValues {
     }
 }
 
+
+#[derive(Serialize, Deserialize, Clone, Debug, Copy)]
+pub struct CircuitPublicValuesV2 {
+    pub natural_txid: [u8; 32],
+    pub merkle_root: [u8; 32],
+    pub lp_reservation_hash: [u8; 32],
+    pub order_nonce: [u8; 32],
+    pub lp_count: u64,
+    pub retarget_block_hash: [u8; 32],
+    pub safe_block_height: u64,
+    pub safe_block_height_delta: u64,
+    pub confirmation_block_height_delta: u64,
+    // #[serde(with = "arrays")]
+    // pub block_hashes: [[u8; 32]; MAX_BLOCKS],
+    pub block_hashes_merkle_root: [u8; 32],
+    #[serde(with = "arrays")]
+    pub block_chainworks: [[u8; 32]; MAX_BLOCKS],
+    pub is_transaction_proof: bool,
+}
+
+impl Default for CircuitPublicValuesV2 {
+    fn default() -> Self {
+        CircuitPublicValuesV2 {
+            natural_txid: [0u8; 32],
+            merkle_root: [0u8; 32],
+            lp_reservation_hash: [0u8; 32],
+            order_nonce: [0u8; 32],
+            lp_count: 0,
+            retarget_block_hash: [0u8; 32],
+            safe_block_height: 0,
+            safe_block_height_delta: 0,
+            confirmation_block_height_delta: 0,
+            // block_hashes: [[0u8; 32]; MAX_BLOCKS],
+            block_hashes_merkle_root: [0u8; 32],
+            block_chainworks: [[0u8; 32]; MAX_BLOCKS],
+            is_transaction_proof: false,
+        }
+    }
+}
+
+impl CircuitPublicValuesV2 {
+    pub fn new(
+        natural_txid: [u8; 32],
+        merkle_root: [u8; 32],
+        lp_reservation_hash: [u8; 32],
+        order_nonce: [u8; 32],
+        lp_count: u64,
+        retarget_block_hash: [u8; 32],
+        safe_block_height: u64,
+        safe_block_height_delta: u64,
+        confirmation_block_height_delta: u64,
+        // block_hashes: Vec<[u8; 32]>,
+        block_hashes_merkle_root: [u8; 32],
+        block_chainworks: Vec<[u8; 32]>,
+        is_transaction_proof: bool,
+    ) -> Self {
+        // let mut padded_block_hashes = [[0u8; 32]; MAX_BLOCKS];
+        // for (i, block_hash) in block_hashes.iter().enumerate() {
+        //     padded_block_hashes[i] = *block_hash;
+        // }
+        let mut padded_block_chainworks = [[0u8; 32]; MAX_BLOCKS];
+        for (i, block_chainwork) in block_chainworks.iter().enumerate() {
+            padded_block_chainworks[i] = *block_chainwork;
+        }
+        Self {
+            natural_txid,
+            merkle_root,
+            lp_reservation_hash,
+            order_nonce,
+            lp_count,
+            retarget_block_hash,
+            safe_block_height,
+            safe_block_height_delta,
+            confirmation_block_height_delta,
+            // block_hashes: padded_block_hashes,
+            block_hashes_merkle_root,
+            block_chainworks: padded_block_chainworks,
+            is_transaction_proof,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub struct CircuitInput {
-    pub public_values: CircuitPublicValues,
+    pub public_values: CircuitPublicValuesV2,
     #[serde(with = "arrays")]
     pub txn_data_no_segwit: [u8; MAX_TX_SIZE],
     pub utilized_txn_data_size: u64,
@@ -185,7 +268,7 @@ pub struct CircuitInput {
 
 impl CircuitInput {
     pub fn new(
-        public_values: CircuitPublicValues,
+        public_values: CircuitPublicValuesV2,
         txn_data_no_segwit: Vec<u8>,
         merkle_proof: Vec<MerkleProofStep>,
         lp_reservation_data: Vec<[[u8; 32]; 2]>,
@@ -230,7 +313,7 @@ impl CircuitInput {
 impl Default for CircuitInput {
     fn default() -> Self {
         Self {
-            public_values: CircuitPublicValues::default(),
+            public_values: CircuitPublicValuesV2::default(),
             txn_data_no_segwit: [0u8; MAX_TX_SIZE],
             utilized_txn_data_size: 0,
             merkle_proof: [MerkleProofStep::default(); MAX_MERKLE_PROOF_STEPS],
@@ -244,7 +327,7 @@ impl Default for CircuitInput {
     }
 }
 
-pub fn validate_rift_transaction(circuit_input: CircuitInput) -> CircuitPublicValues {
+pub fn validate_rift_transaction(circuit_input: CircuitInput) -> CircuitPublicValuesV2 {
     // TODO: Sync up contract public inputs + add logic to validate payment recipient + total swap output amount + aggregate vault hash
     let blocks = circuit_input.blocks[0..(circuit_input.utilized_blocks as usize)].to_vec();
     let txn_data_no_segwit = circuit_input.txn_data_no_segwit
@@ -291,7 +374,8 @@ pub fn validate_rift_transaction(circuit_input: CircuitInput) -> CircuitPublicVa
 
     // Block Verification
     btc_light_client::assert_blockchain(
-        circuit_input.public_values.block_hashes[0..(blocks.len())].to_vec(),
+        // circuit_input.public_values.block_hashes[0..(blocks.len())].to_vec(),
+        circuit_input.public_values.block_hashes_merkle_root,
         circuit_input.public_values.block_chainworks[0..(blocks.len())]
             .to_vec()
             .iter()
@@ -304,4 +388,28 @@ pub fn validate_rift_transaction(circuit_input: CircuitInput) -> CircuitPublicVa
     );
 
     circuit_input.public_values
+}
+
+pub fn get_merkle_root(leaves: Vec<[u8; 32]>) -> [u8; 32] {
+    let mut current_level = leaves;
+    while current_level.len() > 1 {
+        let mut next_level = Vec::new();
+        let mut i = 0;
+
+        while i < current_level.len() {
+            let left = current_level[i];
+            let right = if i + 1 < current_level.len() {
+                current_level[i + 1]
+            } else {
+                left
+            };
+
+            let parent_hash = hash_pairs(left, right);
+            next_level.push(parent_hash);
+
+            i += 2;
+        }
+        current_level = next_level;
+    }
+    current_level[0]
 }

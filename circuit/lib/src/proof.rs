@@ -9,7 +9,8 @@ use rift_core::lp::{compute_lp_hash, encode_liquidity_providers, LiquidityReserv
 
 use crate::transaction::{get_chainworks, serialize_no_segwit};
 use crate::{generate_merkle_proof_and_root, AsRiftOptimizedBlock};
-use rift_core::{CircuitInput, CircuitPublicValues};
+use rift_core::get_merkle_root;
+use rift_core::{CircuitInput, CircuitPublicValuesV2};
 
 use sp1_sdk::{ExecutionReport, HashableKey, ProverClient, SP1Stdin};
 
@@ -87,7 +88,7 @@ pub fn build_transaction_proof_input(
     let safe_block_height = blocks.first().unwrap().bip34_block_height().unwrap();
 
     CircuitInput::new(
-        CircuitPublicValues::new(
+        CircuitPublicValuesV2::new(
             proposed_transaction
                 .compute_txid()
                 .to_byte_array()
@@ -111,10 +112,16 @@ pub fn build_transaction_proof_input(
             safe_block_height,
             proposed_block_index as u64,
             blocks.len() as u64 - 1 - proposed_block_index as u64,
-            blocks
-                .iter()
-                .map(|block| block.header.block_hash().to_byte_array().to_little_endian())
-                .collect(),
+            // blocks
+            //     .iter()
+            //     .map(|block| block.header.block_hash().to_byte_array().to_little_endian())
+            //     .collect(),
+            get_merkle_root(
+                blocks
+                    .iter()
+                    .map(|block| block.header.block_hash().to_byte_array().to_little_endian())
+                    .collect::<Vec<_>>(),
+            ),
             chainworks,
             true,
         ),
@@ -145,7 +152,7 @@ pub fn build_block_proof_input(
         .collect();
 
     CircuitInput::new(
-        CircuitPublicValues::new(
+        CircuitPublicValuesV2::new(
             [0u8; 32],
             [0u8; 32],
             [0u8; 32],
@@ -159,10 +166,16 @@ pub fn build_block_proof_input(
             safe_block_height,
             blocks.len() as u64 - 2,
             1,
-            blocks
-                .iter()
-                .map(|block| block.header.block_hash().to_byte_array().to_little_endian())
-                .collect(),
+            //blocks
+            //    .iter()
+            //    .map(|block| block.header.block_hash().to_byte_array().to_little_endian())
+            //    .collect(),
+            get_merkle_root(
+                blocks
+                    .iter()
+                    .map(|block| block.header.block_hash().to_byte_array().to_little_endian())
+                    .collect::<Vec<_>>(),
+            ),
             chainworks,
             false,
         ),

@@ -24,12 +24,13 @@ pub fn main() {
         safe_block_height: circuit_public_input.safe_block_height,
         safe_block_height_delta: circuit_public_input.safe_block_height_delta,
         confirmation_block_height_delta: circuit_public_input.confirmation_block_height_delta,
-        block_hashes: circuit_public_input.block_hashes
-            [0..(circuit_input.utilized_blocks as usize)]
-            .to_vec()
-            .iter()
-            .map(|x| FixedBytes::from(*x))
-            .collect::<Vec<_>>(),
+        // block_hashes: circuit_public_input.block_hashes
+        //     [0..(circuit_input.utilized_blocks as usize)]
+        //     .to_vec()
+        //     .iter()
+        //     .map(|x| FixedBytes::from(*x))
+        //     .collect::<Vec<_>>(),
+        block_hashes_merkle_root: FixedBytes::from(circuit_public_input.block_hashes_merkle_root),
         block_chainworks: circuit_input.public_values.block_chainworks
             [0..(circuit_input.utilized_blocks as usize)]
             .to_vec()

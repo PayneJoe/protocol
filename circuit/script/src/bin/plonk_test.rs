@@ -8,7 +8,7 @@ use hex_literal::hex;
 use rift_core::lp::LiquidityReservation;
 
 use rift_core::CircuitInput;
-use rift_lib::proof::{self, build_transaction_proof_input};
+use rift_lib::proof::{self, build_transaction_proof_input, build_block_proof_input};
 use rift_lib::{get_retarget_height_from_block_height, load_hex_bytes, to_hex_string};
 
 use clap::Parser;
@@ -34,34 +34,46 @@ fn get_test_case_circuit_input() -> CircuitInput {
         },
     ];
 
-    let mined_blocks = [
-        deserialize::<Block>(&load_hex_bytes("tests/data/block_854373.hex")).unwrap(),
-        deserialize::<Block>(&load_hex_bytes("tests/data/block_854374.hex")).unwrap(),
-        deserialize::<Block>(&load_hex_bytes("tests/data/block_854375.hex")).unwrap(),
-        deserialize::<Block>(&load_hex_bytes("tests/data/block_854376.hex")).unwrap(),
-        deserialize::<Block>(&load_hex_bytes("tests/data/block_854377.hex")).unwrap(),
-        deserialize::<Block>(&load_hex_bytes("tests/data/block_854378.hex")).unwrap(),
-        deserialize::<Block>(&load_hex_bytes("tests/data/block_854379.hex")).unwrap(),
-    ];
+    // let mined_blocks = [
+    //     deserialize::<Block>(&load_hex_bytes("../tests/data/block_854373.hex")).unwrap(),
+    //     deserialize::<Block>(&load_hex_bytes("../tests/data/block_854374.hex")).unwrap(),
+    //     deserialize::<Block>(&load_hex_bytes("../tests/data/block_854375.hex")).unwrap(),
+    //     deserialize::<Block>(&load_hex_bytes("../tests/data/block_854376.hex")).unwrap(),
+    //     deserialize::<Block>(&load_hex_bytes("../tests/data/block_854377.hex")).unwrap(),
+    //     deserialize::<Block>(&load_hex_bytes("../tests/data/block_854378.hex")).unwrap(),
+    //     deserialize::<Block>(&load_hex_bytes("../tests/data/block_854379.hex")).unwrap(),
+    // ];
 
+    let num_blocks = 2000;
+    let mined_blocks = (854373..(854373 + num_blocks)).map(|height| deserialize::<Block>(&load_hex_bytes(format!("../tests/data/block_{height}.hex").as_str())).unwrap()).collect::<Vec<_>>();
+    
     let mined_block_height = 854374;
     let mined_txid = hex!("fb7ea6c1a58f9e827c50aefb3117ce41dd5fecb969041864ec0eff9273b08038");
     let retarget_block_height = get_retarget_height_from_block_height(mined_block_height);
     let mined_retarget_block = deserialize::<Block>(&load_hex_bytes(
-        format!("tests/data/block_{retarget_block_height}.hex").as_str(),
+        format!("../tests/data/block_{retarget_block_height}.hex").as_str(),
     ))
     .unwrap();
 
-    build_transaction_proof_input(
-        &order_nonce,
-        &lp_reservations,
+    // build_transaction_proof_input(
+    //     &order_nonce,
+    //     &lp_reservations,
+    //     safe_chainwork,
+    //     mined_blocks.first().unwrap().bip34_block_height().unwrap(),
+    //     &mined_blocks,
+    //     1,
+    //     &mined_txid,
+    //     &mined_retarget_block,
+    //     mined_retarget_block.bip34_block_height().unwrap(),
+    // )
+    //
+    // specially for consensus validity of bitcoin
+    build_block_proof_input(
         safe_chainwork,
         mined_blocks.first().unwrap().bip34_block_height().unwrap(),
         &mined_blocks,
-        1,
-        &mined_txid,
         &mined_retarget_block,
-        mined_retarget_block.bip34_block_height().unwrap(),
+        retarget_block_height,
     )
 }
 
